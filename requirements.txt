@@ -1,0 +1,3 @@
+requests==2.7.0
+-e git://github.com/anthonypt87/pyzillow.git@03c08af2bcdea6a4895f35b432a3f7745ec47c6b#egg=pyzillow
+wsgiref==0.1.2
