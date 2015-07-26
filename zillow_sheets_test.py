@@ -8,11 +8,43 @@ class ZillowSheetsFillerTest(unittest.TestCase):
 
     def test_zillow_sheets_pulls_info_from_zillow(self):
         zillow_client = mock.Mock()
-        filler = zillow_sheets.ZillowSheetsFiller(zillow_client)
+        worksheet = mock.Mock(row_count=2)
+        worksheet.row_values.return_value = [
+            'Address',
+            'Zip',
+            'Beds'
+        ]
+
+        def mock_get_addr_int(row, column):
+            if column == 1:
+                return 'A2'
+            else:
+                return 'C2'
+
+        worksheet.get_addr_int.side_effect = mock_get_addr_int
+
+        beds_cell = mock.Mock()
+        worksheet.range.return_value = [
+            mock.Mock(value='515 APPIAN WAY NE'),
+            mock.Mock(value='33704'),
+            beds_cell
+        ]
+
+        zillow_client.get_search_results.return_value = {
+            'bedrooms': '4'
+        }
+
+        filler = zillow_sheets.ZillowSheetsFiller(worksheet, zillow_client)
         filler.fill()
+
         zillow_client.get_search_results.assert_called_once_with(
             '515 APPIAN WAY NE',
             '33704'
+        )
+
+        self.assertEqual(beds_cell.value, '4')
+        worksheet.update_cells.assert_called_once_with(
+            worksheet.range.return_value
         )
 
 
