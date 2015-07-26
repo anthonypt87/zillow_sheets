@@ -10,7 +10,10 @@ class ZillowSheetsFillerTest(unittest.TestCase):
         zillow_client = mock.Mock()
         filler = zillow_sheets.ZillowSheetsFiller(zillow_client)
         filler.fill()
-        zillow_client.get_search_results.assert_called_once_with('data')
+        zillow_client.get_search_results.assert_called_once_with(
+            '515 APPIAN WAY NE',
+            '33704'
+        )
 
 
 class ZillowClientTest(unittest.TestCase):

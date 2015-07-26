@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Pull data from zillow and fill in a google doc'
     )
-    parser.add_argument('zillow-api-key')
+    parser.add_argument('zillow_api_key')
     args = parser.parse_args()
 
     zillow_client = ZillowClient(
