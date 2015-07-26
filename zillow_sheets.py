@@ -1,16 +1,31 @@
 import argparse
 import json
+import logging
 
 import gspread
 from oauth2client.client import SignedJwtAssertionCredentials
 from pyzillow.pyzillow import ZillowWrapper
 from pyzillow.pyzillow import GetDeepSearchResults
+from pyzillow.pyzillow import ZillowError
+
+
+logging.basicConfig(
+    format='%(asctime)s %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 ADDRESS_COLUMN_NAME = 'Address'
 ZIP_COLUMN_NAME = 'Zip'
 SHEET_COL_NAME_TO_ZILLOW_NAME_MAPPING_TO_UPDATE = {
-    'Beds': 'bedrooms'
+    'Beds': 'bedrooms',
+    'Usecode': 'home_type',
+    'Year Built': 'year_built',
+    'Baths': 'bathrooms',
+    'Living Area (SF)': 'home_size',
+    'Zestimate': 'zestimate_amount',
 }
 
 
@@ -25,7 +40,17 @@ class ZillowSheetsFiller(object):
 
         # Start at row 2 because the first row is the header row
         for row in range(2, self._worksheet.row_count + 1):
-            self._update_row(row, col_name_to_number_map)
+            logger.info('Working on row: %s' % row)
+            try:
+                self._update_row(row, col_name_to_number_map)
+            except ZillowError as error:
+                logger.warning(
+                    'Had an issue processing row: %s. Got the following '
+                    'error %s' % (
+                        row,
+                        error
+                    )
+                )
 
     def _update_row(self, row, col_name_to_number_map):
         cells = self._get_cells_in_row(row)
@@ -40,7 +65,11 @@ class ZillowSheetsFiller(object):
             zillow_key = SHEET_COL_NAME_TO_ZILLOW_NAME_MAPPING_TO_UPDATE[
                 column
             ]
-            cells[column_number].value = search_results[zillow_key]
+            value = search_results[zillow_key]
+            if value is None:
+                cells[column_number].value = ''
+            else:
+                cells[column_number].value = search_results[zillow_key]
 
         self._worksheet.update_cells(cells)
 
@@ -89,7 +118,7 @@ class ZillowClient(object):
 
 def load_worksheet(credentials_filename, sheet_url):
     with open(credentials_filename) as cred_file:
-        credentials_json = json.load(cred_file.read())
+        credentials_json = json.load(cred_file)
     credentials = SignedJwtAssertionCredentials(
         credentials_json['client_email'],
         credentials_json['private_key'],
@@ -104,7 +133,7 @@ if __name__ == '__main__':
         description='Pull data from zillow and fill in a google doc'
     )
     parser.add_argument('zillow_api_key')
-    parser.add_argument('client_credentials_file')
+    parser.add_argument('credentials_filename')
     parser.add_argument('sheet_url')
     args = parser.parse_args()
 
