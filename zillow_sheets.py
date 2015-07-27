@@ -26,7 +26,15 @@ SHEET_COL_NAME_TO_ZILLOW_NAME_MAPPING_TO_UPDATE = {
     'Baths': 'bathrooms',
     'Living Area (SF)': 'home_size',
     'Zestimate': 'zestimate_amount',
+    'Rent Estimate': 'rentzestimate_amount',
+    'Tax Assessment': 'tax_value',
+    'Comps': 'comparables',
 }
+
+# By default, we tart at row 2 because the first row is the header row
+DEFAULT_ROW_TO_START_AT = 2
+
+MAX_CONSECUTIVE_FAILURES = 4
 
 
 class ZillowSheetsFiller(object):
@@ -35,22 +43,37 @@ class ZillowSheetsFiller(object):
         self._worksheet = worksheet
         self._zillow_client = zillow_client
 
-    def fill(self):
+    def fill(self, start_at=DEFAULT_ROW_TO_START_AT):
         col_name_to_number_map = self._get_column_name_to_column_number()
 
-        # Start at row 2 because the first row is the header row
-        for row in range(2, self._worksheet.row_count + 1):
+        # If we receive MAX_CONSECUTIVE_FAILURES consecutive_failures, we end
+        # the script
+        consecutive_failures = 0
+
+        for row in range(start_at, self._worksheet.row_count + 1):
             logger.info('Working on row: %s' % row)
             try:
                 self._update_row(row, col_name_to_number_map)
+                consecutive_failures = 0
             except ZillowError as error:
+                consecutive_failures += 1
                 logger.warning(
                     'Had an issue processing row: %s. Got the following '
-                    'error %s' % (
+                    'error %s. Have received %s consecutive failures' % (
                         row,
-                        error
+                        error,
+                        consecutive_failures
                     )
                 )
+                if consecutive_failures == MAX_CONSECUTIVE_FAILURES:
+                    logger.warning(
+                        'Ending the script since we received %s '
+                        'consecutive_failures. Possibly ending because we '
+                        'have reached the end of the file.' % (
+                            MAX_CONSECUTIVE_FAILURES
+                        )
+                    )
+                    return
 
     def _update_row(self, row, col_name_to_number_map):
         cells = self._get_cells_in_row(row)
@@ -105,14 +128,37 @@ class ZillowClient(object):
         )
         parsed_zillow_results = self._zillow_results_class(raw_results)
         return {
-            'home_type': parsed_zillow_results.home_type,
-            'year_built': parsed_zillow_results.year_built,
-            'bedrooms': parsed_zillow_results.bedrooms,
             'bathrooms': parsed_zillow_results.bathrooms,
-            'property_size': parsed_zillow_results.property_size,
-            'home_size': parsed_zillow_results.home_size,
-            'zestimate_amount': parsed_zillow_results.zestimate_amount,
+            'bedrooms': parsed_zillow_results.bedrooms,
+            'comparables': parsed_zillow_results.comparables,
+            'graph_data_link': parsed_zillow_results.graph_data_link,
             'home_detail_link': parsed_zillow_results.home_detail_link,
+            'home_size': parsed_zillow_results.home_size,
+            'home_type': parsed_zillow_results.home_type,
+            'last_sold_date': parsed_zillow_results.last_sold_date,
+            'last_sold_price': parsed_zillow_results.last_sold_price,
+            'latitude': parsed_zillow_results.latitude,
+            'longitude': parsed_zillow_results.longitude,
+            'map_this_home_link': parsed_zillow_results.map_this_home_link,
+            'property_size': parsed_zillow_results.property_size,
+            'rentzestimate_amount': parsed_zillow_results.rentzestimate_amount,
+            'tax_value': parsed_zillow_results.tax_value,
+            'year_built': parsed_zillow_results.year_built,
+            'zestimate_amount': parsed_zillow_results.zestimate_amount,
+            'zestimate_last_updated': (
+                parsed_zillow_results.zestimate_last_updated
+            ),
+            'zestimate_percentile': parsed_zillow_results.zestimate_percentile,
+            'zestimate_valuation_range_high': (
+                parsed_zillow_results.zestimate_valuation_range_high
+            ),
+            'zestimate_valuation_range_low': (
+                parsed_zillow_results.zestimate_valuation_range_low
+            ),
+            'zestimate_value_change': (
+                parsed_zillow_results.zestimate_value_change
+            ),
+            'zillow_id': parsed_zillow_results.zillow_id,
         }
 
 
@@ -135,6 +181,12 @@ if __name__ == '__main__':
     parser.add_argument('zillow_api_key')
     parser.add_argument('credentials_filename')
     parser.add_argument('sheet_url')
+    parser.add_argument(
+        '--start-at',
+        default=DEFAULT_ROW_TO_START_AT,
+        help='Row to start at',
+        type=int
+    )
     args = parser.parse_args()
 
     worksheet = load_worksheet(args.credentials_filename, args.sheet_url)
@@ -144,4 +196,4 @@ if __name__ == '__main__':
         GetDeepSearchResults
     )
 
-    print ZillowSheetsFiller(worksheet, zillow_client).fill()
+    ZillowSheetsFiller(worksheet, zillow_client).fill(args.start_at)
