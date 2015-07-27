@@ -8,6 +8,8 @@ from pyzillow.pyzillow import ZillowWrapper
 from pyzillow.pyzillow import GetDeepSearchResults
 from pyzillow.pyzillow import ZillowError
 
+import config
+
 
 logging.basicConfig(
     format='%(asctime)s %(message)s',
@@ -162,8 +164,8 @@ class ZillowClient(object):
         }
 
 
-def load_worksheet(credentials_filename, sheet_url):
-    with open(credentials_filename) as cred_file:
+def load_worksheet(google_credentials_file, sheet_url):
+    with open(google_credentials_file) as cred_file:
         credentials_json = json.load(cred_file)
     credentials = SignedJwtAssertionCredentials(
         credentials_json['client_email'],
@@ -178,9 +180,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Pull data from zillow and fill in a google doc'
     )
-    parser.add_argument('zillow_api_key')
-    parser.add_argument('credentials_filename')
-    parser.add_argument('sheet_url')
+    parser.add_argument('--zillow-api-key', default=config.zillow_api_key)
+    parser.add_argument(
+        '--google-credentials-file',
+        default=config.google_credentials_file
+    )
+    parser.add_argument('--sheet_url', default=config.sheet_url)
     parser.add_argument(
         '--start-at',
         default=DEFAULT_ROW_TO_START_AT,
@@ -189,7 +194,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    worksheet = load_worksheet(args.credentials_filename, args.sheet_url)
+    worksheet = load_worksheet(args.google_credentials_file, args.sheet_url)
 
     zillow_client = ZillowClient(
         ZillowWrapper(args.zillow_api_key),
